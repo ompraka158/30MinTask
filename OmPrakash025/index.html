@@ -30,7 +30,7 @@ input[type=checkbox]{
 // put all the javascript code within same block ( for variable scope - see details online )
 {
     // declare variables before using them ( pColor1 = Color for player1 | pColor2 = Color for player2 ...)
-	var pColor1, pColor2, pName1, pName2, turn;
+	var pColor1, pColor2, pName1, pName2, turn, score1=0, score2=0;
 	
 	// we have 9 boxes: <td id="box1"> ... <td id="box4"> ... 
 	// each box has id="box"+number attribute, starting from 1, ending in 9
@@ -89,9 +89,80 @@ input[type=checkbox]{
 		dgi('p2Color').style.backgroundColor = pColor2;
 	}
 	
+    
+    function loadScore(pname1,pname2){
+        $.ajax({
+            url: 'http://localhost:61628/api/Scorings/'+pname1,
+            type: 'GET',
+            dataType: 'json',
+            success: function(res){     
+                dgi('p1Score').innerHTML = res.Score;
+            }
+        });
+        $.ajax({
+            url: 'http://localhost:61628/api/Scorings/'+pname2,
+            type: 'GET',
+            dataType: 'json',
+            success: function(res){      
+                dgi('p2Score').innerHTML = res.Score;
+            }
+        });
+    }
+    
+    function addNew(){
+        $.ajax({
+            url: 'http://localhost:61628/api/Scorings/'+$('#newName').val(),
+            type: 'GET',
+            dataType: 'json',
+            success: function(res){      
+                alert("Player exists cannot add!!!");
+            },
+            error:function(){
+                regData = { 
+                    "Name": $('#newName').val(), 
+                    "score": 0 
+                };
+                $.ajax({
+                    type : "POST",
+                    url : "http://localhost:61628/api/Scorings/", 
+                    dataType : "json",
+                    data : regData, 
+                    success : function (msg) {
+                        alert("Player added!!!");
+                        window.location="index.html";
+                    }
+                });
+            }
+        });
+        
+    }
+    
+    function updateScore(pname,score){
+        var sc=Number(score);
+        $.ajax({
+            url: 'http://localhost:61628/api/Scorings/'+pname,
+            type: 'GET',
+            dataType: 'json',
+            success: function(res){      
+                sc=res.Score+sc;
+                $.ajax({
+                    url: 'http://localhost:61628/api/Scorings/'+pname,
+                    type: 'PUT',
+                    dataType: 'json',
+                    data:{
+                        "Name": res.Name, 
+                        "score": sc
+                    },
+                    success: function(res){      
+                        console.log(sc);
+                    }
+                });
+            }
+        });
+    }
 	// works exactly as the setPlayerColor() function
 	function setPlayerName( player, nameID ){
-        var name = nameID.options[nameID.selectedIndex].text
+        var name = nameID.options[nameID.selectedIndex].text;
 	    dgi('errBox').innerHTML = '';
 	    dgi('startButton').disabled = false;
 		switch(player){
@@ -117,7 +188,6 @@ input[type=checkbox]{
 		dgi('p1Name').innerHTML = name;
 		dgi('p2Name').innerHTML = name;
 	}
-	
 	// the main logic of the game... takes the input checkbox that was clicked
 	// and then checks whose turn it was... updates the information being showed
 	// and then checks if any one of the user has won the game or not...
@@ -186,9 +256,15 @@ input[type=checkbox]{
 	                
 	                if( turn == 1){
         	            pName = pName1;
+                        updateScore(pName1,10);
+                        updateScore(pName2,-5);
+                        loadScore(pName1,pName2);
         	        }
         	        else if( turn == 2){
         	            pName = pName2;
+                        updateScore(pName1,-5);
+                        updateScore(pName2,10);
+                        loadScore(pName1,pName2);
         	        }
         	        
         	        // save game report to the 'Game Records' section
@@ -217,17 +293,17 @@ input[type=checkbox]{
     
     function loadData(){
         $.ajax({
-            url: 'http://localhost:57163/api/Scorings/',
+            url: 'http://localhost:61628/api/Scorings/',
             type: 'GET',
             dataType: 'json',
             success: function(res){
                  $.each(res, function(key, value) {
                     $('#p1NameInput')
-                        .append($('<option>', { value : value.ID })
-                        .text(value.PlayerName));
+                        .append($('<option>', { value : value.Name })
+                        .text(value.Name));
                      $('#p2NameInput')
-                        .append($('<option>', { value : value.ID })
-                        .text(value.PlayerName));
+                        .append($('<option>', { value : value.Name })
+                        .text(value.Name));
                  });
             }
         });    
@@ -310,7 +386,7 @@ input[type=checkbox]{
     	dgi('box3').style.borderTop = dgi('box6').style.borderRight = dgi('box7').style.borderLeft = 
     	dgi('box7').style.borderBottom = dgi('box8').style.borderBottom = dgi('box9').style.borderBottom = 
     	dgi('box9').style.borderRight = 'none';
-		
+		loadScore(dgi('p1NameInput').value,dgi('p2NameInput').value);
 		turn = 1;
 	}
 	
@@ -339,31 +415,7 @@ input[type=checkbox]{
 		}
 	}
     
-    function addNew(){
-        regData = { 
-            "PlayerName": $('#newName').val(), 
-            "score": 0 
-           };
-        $.ajax({
-           type : "POST",
-           url : "http://localhost:57163/api/Scorings/", 
-            
-           dataType : "json",
-           data : regData, 
-            
-           success : function (msg) {
-               if (msg) {
-                   loadData();
-               } 
-               else {
-                   alert("Cannot add to list !");
-               }
-           },error: function(e)
-            {
-              console.log(e);  
-            }
-        });
-    }
+    
 	
 	// swaps the values of players' names and colors
 	// uses simple trick: [ dummyVariable c = a, a = b, b = c ] technique of swapping
@@ -444,7 +496,7 @@ input[type=checkbox]{
 		</p>
 		<p>
 			Player-2
-            <select id="p2NameInput" onChange="setPlayerName(2, this"></select>
+            <select id="p2NameInput" onChange="setPlayerName(2, this)"></select>
 			<select id="p2ColorInput" onChange="setPlayerColor(2, this.value)">
 				<option value="#FFCCCC">Light Red</option>
 				<option value="#CCCCFF">Light Blue</option>
